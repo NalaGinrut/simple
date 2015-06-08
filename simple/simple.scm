@@ -16,6 +16,7 @@
 (define-module (language simple simple)
   #:use-module (system base lalr)
   #:use-module (language tree-il)
+  #:use-module (ice-9 and-let-star)
   #:use-module (ice-9 match)
   #:export (make-simple-tokenizer make-parser compile-tree-il))
 
@@ -33,7 +34,7 @@
 (define (is-number? c) (char-set-contains? char-set:hex-digit c))
 ;; operators, in this simple case, we just have four operators
 (define (is-op? c) (string-contains "+-*/" (string c)))
-(define (is-delimiter? c) 
+(define (is-delimiter? c)
   (or (eof-object? c) (string-contains " +-*/;\n" (string c))))
 (define (get-number port)
  (let lp((c (peek-char port)) (ret '()))
@@ -63,7 +64,9 @@
 (define (make-simple-tokenizer port) (lambda () (next-token port)))
 (define (make-parser)
   (lalr-parser
-   (number (left: + -) (left: * /))
+   (driver: lr)
+   ;;(driver: glr)
+   (number #;(left: + -) #;(left: * /))
    (program (exp) : $1
             (*eoi*) : (call-with-input-string "" read)) ; *eof-object*
    (exp  (exp + term) : `(+ ,$1 ,$3)
@@ -76,6 +79,10 @@
 (define (compile-tree-il exp env opts)
   (values (parse-tree-il (comp exp '())) env env))
 (define (comp src e)
+  (and-let* (((supports-source-properties? src))
+             (loc (source-property src 'loc)))
+            (format (current-error-port) "LOC [~a]: ~a\n" loc src))
   (match src
     (('number x) `(const ,x))
-    ((op x y) `(apply (primitive ,op) ,(comp x e) ,(comp y e)))))
+    ((op x y) `(call (primitive ,op) ,(comp x e) ,(comp y e)))
+    ((h t ...) (comp h e)))) ;; for driver glr
