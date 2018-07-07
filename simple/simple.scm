@@ -64,9 +64,8 @@
 (define (make-simple-tokenizer port) (lambda () (next-token port)))
 (define (make-parser)
   (lalr-parser
-   (driver: lr)
-   ;;(driver: glr)
-   (number #;(left: + -) #;(left: * /))
+   (number + - * /)
+   ;;((number #;(left: + -) #;(left: * /))
    (program (exp) : $1
             (*eoi*) : (call-with-input-string "" read)) ; *eof-object*
    (exp  (exp + term) : `(+ ,$1 ,$3)
